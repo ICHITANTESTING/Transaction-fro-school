@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Manager (Khmer)</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Battambang', 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .glass-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 1rem;
+        }
+
+        .month-btn {
+            white-space: nowrap;
+            padding: 0.5rem 1.25rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #64748b;
+            background: white;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+            font-family: 'Battambang', sans-serif;
+        }
+        .month-btn:hover { border-color: #cbd5e1; color: #334155; }
+        
+        .month-btn.active {
+            background: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .table-row-hover:hover { background-color: #f8fafc; }
+        
+        #transaction-modal, #dish-modal { transition: opacity 0.2s ease-in-out; }
+        #transaction-modal:not(.hidden), #dish-modal:not(.hidden) { opacity: 1; }
+        
+        .dish-chip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.1s;
+        }
+        .dish-chip:hover { border-color: #6366f1; }
+        
+        .dish-select-area {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: left;
+            cursor: pointer;
+        }
+        .dish-select-area:hover { background-color: #f8fafc; }
+
+        .dish-actions {
+            display: flex;
+            background: #f1f5f9;
+            border-left: 1px solid #e2e8f0;
+        }
+        .dish-action-btn {
+            padding: 8px;
+            color: #64748b;
+            transition: colors 0.2s;
+        }
+        .dish-action-btn:hover { background-color: #e2e8f0; color: #0f172a; }
+        .dish-action-btn.delete:hover { background-color: #fee2e2; color: #ef4444; }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col p-4 md:p-8 max-w-7xl mx-auto">
+
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                <i data-lucide="store" class="w-8 h-8 text-indigo-600"></i>
+                ប្រតិបត្តិការប្រចាំថ្ងៃ
+            </h1>
+            <p class="text-slate-500 mt-1">ចំណាយប្រចាំថ្ងៃ</p>
+        </div>
+
+        <div class="flex gap-3 w-full md:w-auto">
+            <button id="add-transaction-btn" class="flex-1 md:flex-none items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all flex">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                <span>បន្ថែមថ្មី</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        <div class="glass-card p-6 bg-gradient-to-br from-indigo-600 to-violet-600 text-white border-none lg:col-span-1">
+            <h3 class="text-indigo-100 text-sm font-bold uppercase tracking-wider mb-1">សរុបទឹកប្រាក់</h3>
+            <div class="flex items-baseline gap-1">
+                <span id="total-expense" class="text-4xl font-bold tracking-tight">$0.00</span>
+            </div>
+            <p class="text-indigo-200 text-xs mt-4">សម្រាប់ខែ/ឆ្នាំដែលបានជ្រើសរើស</p>
+        </div>
+
+        <div class="glass-card p-4 lg:col-span-3 flex flex-col justify-center">
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                
+                <div class="flex-shrink-0 w-full md:w-32">
+                    <div class="relative">
+                        <i data-lucide="calendar" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                        <select id="year-select" class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer font-sans"></select>
+                    </div>
+                </div>
+
+                <div class="w-full overflow-hidden relative">
+                    <div id="months-container" class="flex gap-2 overflow-x-auto no-scrollbar py-1 mask-linear items-center">
+                        </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="pdf-export-area" class="glass-card flex-1 flex flex-col overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="history" class="w-5 h-5 text-slate-400"></i>
+                    បញ្ជីប្រតិបត្តិការ
+                </h2>
+                <p id="pdf-subtitle" class="text-xs text-slate-400 font-medium mt-1">All Records</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="record-count" class="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">0</span>
+                <div class="h-4 w-px bg-slate-200 mx-2"></div>
+                <button id="export-pdf-btn" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><i data-lucide="file-down" class="w-5 h-5"></i></button>
+                <button id="export-excel-btn" class="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"><i data-lucide="table" class="w-5 h-5"></i></button>
+            </div>
+        </div>
+        <div class="overflow-auto flex-1" id="scroll-box">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 sticky top-0 z-10">
+                    <tr>
+                        <th class="py-3 px-5 text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">កាលបរិច្ឆេទ</th>
+                        <th class="py-3 px-5 text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">បរិយាយ</th>
+                        <th class="py-3 px-5 text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200 text-right">ចំនួនទឹកប្រាក់</th>
+                        <th class="py-3 px-5 text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200 text-center exclude-from-pdf">សកម្មភាព</th>
+                    </tr>
+                </thead>
+                <tbody id="transaction-table-body" class="divide-y divide-slate-100 text-sm">
+                    <tr><td colspan="4" class="text-center p-8 text-slate-400">កំពុងទាញទិន្នន័យ...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="transaction-modal" class="hidden fixed inset-0 z-40 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"></div>
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i data-lucide="receipt" class="w-6 h-6 text-indigo-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg font-bold leading-6 text-slate-900" id="modal-title">បន្ថែមកំណត់ត្រា</h3>
+                            
+                            <form id="transaction-form" class="mt-6 space-y-4">
+                                <input type="hidden" id="transaction-id">
+
+                                <div>
+                                    <label class="block text-sm font-bold leading-6 text-slate-900">កាលបរិច្ឆេទ</label>
+                                    <input type="date" id="date" class="mt-1 block w-full rounded-md border-0 py-2.5 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm font-sans" required>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-bold leading-6 text-slate-900">បរិយាយ</label>
+                                    <div class="mt-1 flex gap-2">
+                                        <input type="text" list="dishes-datalist" id="description" class="block w-full rounded-md border-0 py-2.5 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm" placeholder="វាយបញ្ចូល ឬជ្រើសរើស..." required autocomplete="off">
+                                        
+                                        <button type="button" id="toggle-dishes-btn" class="shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-600 p-2.5 rounded-md border border-slate-300 transition-colors" title="ជ្រើសរើសមុខម្ហូប">
+                                            <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                                        </button>
+                                        
+                                        <datalist id="dishes-datalist"></datalist>
+                                    </div>
+
+                                    <div id="dish-selection-area" class="hidden mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                        <div class="flex justify-between items-center mb-3">
+                                            <p class="text-xs font-bold text-slate-500">ជ្រើសរើសមុខម្ហូប</p>
+                                            <button type="button" id="btn-add-new-dish" class="text-xs flex items-center gap-1 text-indigo-600 font-bold hover:underline">
+                                                <i data-lucide="plus" class="w-3 h-3"></i> បង្កើតថ្មី
+                                            </button>
+                                        </div>
+                                        <div id="dish-buttons-container" class="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                                            </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-bold leading-6 text-slate-900">ចំនួនទឹកប្រាក់ ($)</label>
+                                    <div class="relative mt-1">
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                                        <input type="number" id="amount" min="0" step="0.01" class="block w-full rounded-md border-0 py-2.5 pl-7 pr-3 text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm font-sans" placeholder="0.00" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-8 flex flex-row-reverse gap-3">
+                                    <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-500 sm:w-auto">រក្សាទុក</button>
+                                    <button type="button" id="modal-cancel" class="inline-flex w-full justify-center rounded-lg bg-white px-3 py-2.5 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:w-auto">បោះបង់</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dish-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+                <h3 id="dish-modal-title" class="text-lg font-bold text-slate-800 mb-4">បន្ថែមមុខម្ហូបថ្មី</h3>
+                <form id="dish-form" class="space-y-4">
+                    <input type="hidden" id="dish-id">
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase">ឈ្មោះមុខម្ហូប</label>
+                        <input type="text" id="dish-name" class="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 border p-2 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="ឧ. បាយឆា..." required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase">តម្លៃដើម ($)</label>
+                        <input type="number" step="0.01" id="dish-price" class="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 border p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-sans" placeholder="0.00">
+                    </div>
+
+                    <div class="flex gap-2 mt-6 pt-2">
+                        <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold">រក្សាទុក</button>
+                        <button type="button" id="dish-cancel" class="flex-1 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 py-2 rounded-lg font-bold">បោះបង់</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        lucide.createIcons();
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5pOucbwKL8Uxen770DvFwSFMICj_NbzM",
+            authDomain: "durenfarmsmanrony.firebaseapp.com",
+            projectId: "durenfarmsmanrony",
+            storageBucket: "durenfarmsmanrony.firebasestorage.app",
+            messagingSenderId: "25819847299",
+            appId: "1:25819847299:web:db1adbd7059dd7808c19b6"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let allTransactions = [];
+        let allDishes = [];
+        let selectedYear = new Date().getFullYear();
+        let selectedMonth = "";
+
+        const MONTHS = [
+            {k:"01",name:"មករា"}, {k:"02",name:"កុម្ភៈ"}, {k:"03",name:"មីនា"},
+            {k:"04",name:"មេសា"}, {k:"05",name:"ឧសភា"}, {k:"06",name:"មិថុនា"},
+            {k:"07",name:"កក្កដា"}, {k:"08",name:"សីហា"}, {k:"09",name:"កញ្ញា"},
+            {k:"10",name:"តុលា"}, {k:"11",name:"វិច្ឆិកា"}, {k:"12",name:"ធ្នូ"},
+        ];
+
+        function renderMonths(){
+            const container = document.getElementById("months-container");
+            container.innerHTML="";
+
+            // "View All" Button
+            const viewAllBtn = document.createElement("button");
+            viewAllBtn.className = "month-btn";
+            viewAllBtn.innerText = "មើលទាំងអស់";
+            viewAllBtn.dataset.v = "";
+            viewAllBtn.onclick = () => { selectedMonth = ""; highlightMonth(); filterData(); };
+            container.appendChild(viewAllBtn);
+
+            // Month Buttons
+            MONTHS.forEach(m=>{
+                const btn=document.createElement("button");
+                btn.className="month-btn";
+                btn.innerText=m.name;
+                btn.dataset.v=m.k;
+                btn.onclick=()=>{
+                    selectedMonth = (selectedMonth === m.k ? "" : m.k);
+                    highlightMonth();
+                    filterData();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function highlightMonth(){
+            document.querySelectorAll(".month-btn").forEach(btn => {
+                const isActive = btn.dataset.v === selectedMonth;
+                btn.classList.toggle("active", isActive);
+                if(isActive && btn.dataset.v !== "") {
+                    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            });
+        }
+
+        function populateYears(){
+            const ySet=new Set(allTransactions.map(t=>t.date?.slice(0,4)));
+            ySet.add(String(new Date().getFullYear()));
+            const select=document.getElementById("year-select");
+            select.innerHTML="";
+            [...ySet].sort((a,b)=>b-a).forEach(y=>{
+                let opt=document.createElement("option"); opt.value=y; opt.innerText=y; select.appendChild(opt);
+            });
+            select.value=selectedYear;
+        }
+        document.getElementById("year-select").onchange=e=>{ selectedYear=e.target.value; filterData(); };
+
+        function filterData(){
+            let data = [...allTransactions];
+            data = data.filter(t=>t.date?.startsWith(selectedYear));
+            if(selectedMonth) data = data.filter(t=>t.date?.startsWith(`${selectedYear}-${selectedMonth}`));
+            data.sort((a,b)=>new Date(b.date)-new Date(a.date));
+            
+            renderTable(data);
+            
+            const total = data.reduce((s,t)=>s+Number(t.amount),0);
+            document.getElementById("total-expense").innerText=`$${total.toFixed(2)}`;
+            
+            let subtitle = "";
+            if(selectedMonth) {
+                const mObj = MONTHS.find(m=>m.k===selectedMonth);
+                subtitle = `${mObj ? mObj.name : selectedMonth} ${selectedYear}`;
+            } else {
+                subtitle = `ទាំងអស់ — ${selectedYear}`;
+            }
+            document.getElementById("pdf-subtitle").innerText = subtitle;
+        }
+
+        function renderTable(data){
+            const tbody=document.getElementById("transaction-table-body");
+            document.getElementById("record-count").innerText=`${data.length}`;
+            tbody.innerHTML="";
+            if(!data.length){ tbody.innerHTML=`<tr><td colspan="4" class="text-center p-8 text-slate-400">មិនមានទិន្នន័យ</td></tr>`; return;}
+
+            data.forEach(t=>{
+                const tr=document.createElement("tr");
+                tr.className = "table-row-hover group transition-colors";
+                tr.innerHTML=`
+                    <td class="py-3 px-5 text-slate-600 font-sans">${formatDate(t.date)}</td>
+                    <td class="py-3 px-5 text-slate-800 font-medium">${t.description}</td>
+                    <td class="py-3 px-5 text-right font-bold text-slate-700 font-sans">$${Number(t.amount).toFixed(2)}</td>
+                    <td class="py-3 px-5 exclude-from-pdf text-center">
+                        <div class="flex justify-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button class="p-1.5 text-blue-600 hover:bg-blue-50 rounded" onclick="editTransaction('${t.id}')"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                            <button class="p-1.5 text-red-600 hover:bg-red-50 rounded" onclick="deleteTransaction('${t.id}')"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function formatDate(d) {
+            try { return new Date(d).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric'}); }
+            catch(e) { return d; }
+        }
+
+        document.getElementById("toggle-dishes-btn").onclick=()=>{ document.getElementById("dish-selection-area").classList.toggle("hidden"); };
+        function updateDishUI() {
+            const dataList = document.getElementById("dishes-datalist");
+            const btnContainer = document.getElementById("dish-buttons-container");
+            dataList.innerHTML = ""; btnContainer.innerHTML = "";
+            if(allDishes.length === 0) btnContainer.innerHTML = `<p class="text-center text-sm text-slate-400 py-2">មិនទាន់មានមុខម្ហូប</p>`;
+            allDishes.forEach(dish => {
+                if(!dish.name) return;
+                const option = document.createElement("option"); option.value = dish.name; dataList.appendChild(option);
+                const chip = document.createElement("div"); chip.className = "dish-chip";
+                const selectArea = document.createElement("div"); selectArea.className = "dish-select-area";
+                selectArea.innerHTML = `<div class="flex justify-between items-center w-full"><span class="font-medium truncate text-slate-700">${dish.name}</span><span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-sans">$${Number(dish.price||0).toFixed(2)}</span></div>`;
+                selectArea.onclick = () => { document.getElementById("description").value = dish.name; document.getElementById("amount").value = dish.price || ""; document.getElementById("dish-selection-area").classList.add("hidden"); };
+                const actions = document.createElement("div"); actions.className = "dish-actions";
+                const editBtn = document.createElement("button"); editBtn.className = "dish-action-btn"; editBtn.innerHTML = `<i data-lucide="pencil" class="w-3 h-3"></i>`; editBtn.onclick = (e) => { e.stopPropagation(); openDishModal(dish); };
+                const delBtn = document.createElement("button"); delBtn.className = "dish-action-btn delete"; delBtn.innerHTML = `<i data-lucide="trash-2" class="w-3 h-3"></i>`; delBtn.onclick = (e) => { e.stopPropagation(); deleteDish(dish.id); };
+                actions.appendChild(editBtn); actions.appendChild(delBtn); chip.appendChild(selectArea); chip.appendChild(actions); btnContainer.appendChild(chip);
+            });
+            lucide.createIcons();
+        }
+
+        document.getElementById("btn-add-new-dish").onclick = () => openDishModal();
+        function openDishModal(dish = null){
+            document.getElementById("dish-modal").classList.remove("hidden");
+            if(dish){ document.getElementById("dish-modal-title").innerText="កែប្រែមុខម្ហូប"; document.getElementById("dish-id").value=dish.id; document.getElementById("dish-name").value=dish.name; document.getElementById("dish-price").value=dish.price; }
+            else { document.getElementById("dish-modal-title").innerText="បន្ថែមមុខម្ហូបថ្មី"; document.getElementById("dish-form").reset(); document.getElementById("dish-id").value=""; }
+        }
+        document.getElementById("dish-cancel").onclick = () => document.getElementById("dish-modal").classList.add("hidden");
+        document.getElementById("dish-form").onsubmit = async (e) => { e.preventDefault(); const id=document.getElementById("dish-id").value; const data={ name:document.getElementById("dish-name").value, price:Number(document.getElementById("dish-price").value) }; if(id) await setDoc(doc(db,"dishes",id),data); else await addDoc(collection(db,"dishes"),data); document.getElementById("dish-modal").classList.add("hidden"); };
+        window.deleteDish = async (id) => { if(confirm("តើអ្នកចង់លុបមុខម្ហូបនេះមែនទេ?")) await deleteDoc(doc(db, "dishes", id)); };
+
+        window.editTransaction=(id)=>{
+            const t=allTransactions.find(x=>x.id===id);
+            document.getElementById("transaction-id").value=id; document.getElementById("date").value=t.date; document.getElementById("description").value=t.description; document.getElementById("amount").value=t.amount;
+            document.getElementById("modal-title").innerText="កែប្រែកំណត់ត្រា"; document.getElementById("dish-selection-area").classList.add("hidden"); document.getElementById("transaction-modal").classList.remove("hidden");
+        };
+        window.deleteTransaction=async(id)=>{ if(confirm("តើអ្នកចង់លុបកំណត់ត្រានេះមែនទេ?")) await deleteDoc(doc(db,"transactions",id)); };
+        document.getElementById("modal-cancel").onclick=()=>{ document.getElementById("transaction-modal").classList.add("hidden"); setTimeout(() => { document.getElementById("transaction-form").reset(); document.getElementById("transaction-id").value=""; document.getElementById("modal-title").innerText="បន្ថែមកំណត់ត្រា"; }, 200); };
+        document.getElementById("add-transaction-btn").onclick=()=>{ document.getElementById("transaction-id").value=""; document.getElementById("date").value=new Date().toISOString().slice(0,10); document.getElementById("transaction-modal").classList.remove("hidden"); };
+        document.getElementById("transaction-form").onsubmit=async e=>{ e.preventDefault(); const id=document.getElementById("transaction-id").value; const data={ date:document.getElementById("date").value, description:document.getElementById("description").value, amount:Number(document.getElementById("amount").value), type:"expense" }; if(id) await setDoc(doc(db,"transactions",id),data); else await addDoc(collection(db,"transactions"),data); document.getElementById("transaction-modal").classList.add("hidden"); document.getElementById("transaction-form").reset(); };
+
+        // INITIALIZATION
+        onSnapshot(collection(db,"transactions"), snap=>{
+            allTransactions=snap.docs.map(d=>({id:d.id,...d.data()}));
+            
+            // If it's the very first load (options empty), set defaults
+            if(document.getElementById("year-select").options.length === 0) {
+                const now = new Date();
+                selectedYear = String(now.getFullYear());
+                selectedMonth = String(now.getMonth() + 1).padStart(2, "0");
+            }
+
+            renderMonths();
+            populateYears();
+            highlightMonth(); // This ensures the current month is selected visually
+            filterData();
+        });
+
+        onSnapshot(collection(db,"dishes"), snap=>{ allDishes=snap.docs.map(d=>({id:d.id, ...d.data()})); updateDishUI(); });
+        document.getElementById("description").addEventListener('input', (e) => { const val=e.target.value; const found=allDishes.find(d=>d.name===val); if(found&&found.price){ const amt=document.getElementById("amount"); if(amt.value===""||amt.value==0) amt.value=found.price; } });
+
+        /* --- PDF EXPORT WITH TOTAL --- */
+        document.getElementById("export-pdf-btn").onclick=async ()=>{
+            const clone = document.createElement("div");
+            clone.style.padding="40px"; clone.style.background="white"; clone.style.fontFamily="Battambang, Inter, sans-serif";
+            
+            const h = `
+                <div style="border-bottom:2px solid #eee;margin-bottom:20px;padding-bottom:10px">
+                    <h1 style="font-size:24px;font-weight:bold">របាយការណ៍ប្រតិបត្តិការ</h1>
+                    <p style="color:#666">${document.getElementById("pdf-subtitle").innerText}</p>
+                </div>`;
+            
+            // Get current total
+            const currentTotal = document.getElementById("total-expense").innerText;
+
+            clone.innerHTML = h + document.querySelector("#pdf-export-area table").outerHTML;
+            document.body.appendChild(clone);
+            
+            // Remove actions column
+            clone.querySelectorAll(".exclude-from-pdf").forEach(e=>e.remove());
+            
+            // ADD TOTAL ROW TO TABLE FOOTER
+            const table = clone.querySelector("table");
+            const tfoot = document.createElement("tfoot");
+            tfoot.innerHTML = `
+                <tr style="background-color: #f1f5f9;">
+                    <td colspan="2" style="padding: 12px 20px; text-align: right; font-weight: bold; border-top: 2px solid #e2e8f0;">សរុបរួម (Total)</td>
+                    <td style="padding: 12px 20px; text-align: right; font-weight: bold; border-top: 2px solid #e2e8f0; font-family: sans-serif;">${currentTotal}</td>
+                </tr>
+            `;
+            table.appendChild(tfoot);
+
+            await html2pdf().set({ margin:10, filename:`report.pdf`, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4'} }).from(clone).save();
+            clone.remove();
+        };
+
+        document.getElementById("export-excel-btn").onclick=()=>{
+            let rows=[["Date","Description","Amount"]];
+            let data = [...allTransactions].filter(t=>t.date?.startsWith(selectedYear));
+            if(selectedMonth) data = data.filter(t=>t.date?.startsWith(`${selectedYear}-${selectedMonth}`));
+            data.sort((a,b)=>new Date(b.date)-new Date(a.date));
+            data.forEach(t=>rows.push([t.date, `"${(t.description||'').replace(/"/g,'""')}"`, t.amount]));
+            const b=new Blob([rows.map(r=>r.join(",")).join("\n")],{type:"text/csv"});
+            const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="report.csv"; a.click();
+        };
+    </script>
+</body>
+</html>
